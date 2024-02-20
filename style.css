@@ -1,0 +1,15 @@
+.Select-option {
+    color: blue;
+}
+
+.Select-control {
+    text-align: center;
+}
+
+.Select-option {
+    font-size: 14px;
+}
+
+body {
+    background-color: #bcce4a; /* Replace with your desired background color */
+  }

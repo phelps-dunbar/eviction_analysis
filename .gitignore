@@ -1,0 +1,14 @@
+# ignore the csv and xlsx files
+*.csv
+*.xlsx
+*.png
+```
+
+# ignore all yaml files
+*.yaml
+
+# ignore everything in the enivornment folder
+evict_env/
+
+# ignore __pycache__  folder
+__pycache__/
