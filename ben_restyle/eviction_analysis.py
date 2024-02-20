@@ -43,6 +43,7 @@ controls = html.Div(
         html.Div(
             [
                 html.H2("Filter the Data", className="control_label"),
+                # add radio buttons to control count graph here
                 dcc.Graph(id="overall-graph"),
             ],
             className="control_graph",
@@ -122,11 +123,20 @@ insights_and_graphs = html.Div(
     className="results_container",
 )
 
+datatable_container = html.Div(
+    [
+        html.H2("Data Table", className="graph_title"),
+        # data table here
+    ],
+    className="data_table_container",
+)
+
 app.layout = html.Div(
     [
         header,
         controls,
         insights_and_graphs,
+        datatable_container,
     ],
     className="container",
 )
