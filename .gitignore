@@ -12,3 +12,7 @@ evict_env/
 
 # ignore __pycache__  folder
 __pycache__/
+
+# ignore the elite_sql_call python file
+elite_sql_call.py
+Bill_meeting_20240221/elite_sql_call.py

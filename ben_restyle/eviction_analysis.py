@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output, dash_table
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -33,7 +33,8 @@ app = dash.Dash(__name__)
 # create the app layout
 header = html.Div(
     [
-        html.H1("Flat Fee Calculator for Texas Eviction Cases", className="header-title"),
+        html.H1("Flat Fee Calculator for Texas Eviction Cases",
+                className="header-title"),
     ],
     className="header",
 )
@@ -43,7 +44,13 @@ controls = html.Div(
         html.Div(
             [
                 html.H2("Filter the Data", className="control_label"),
-                # add radio buttons to control count graph here
+                dcc.RadioItems(
+                    id='radio-buttons',
+                    options=[
+                        {'label': 'County', 'value': 'county'},
+                        {'label': 'Client', 'value': 'client'},
+                        {'label': 'Category', 'value': 'category'}
+                    ], value='county'),
                 dcc.Graph(id="overall-graph"),
             ],
             className="control_graph",
@@ -55,19 +62,8 @@ controls = html.Div(
                         html.Div("Select a county", className="control_label"),
                         dcc.Dropdown(
                             id="county-dropdown",
-                            options=[{"label": county, "value": county} for county in df["county"].dropna().unique()],
-                            value=None,
-                            multi=True,
-                        ),
-                    ],
-                    className="control_item",
-                ),
-                                html.Div(
-                    [
-                        html.Div("Select a client", className="control_label"),
-                        dcc.Dropdown(
-                            id="client-dropdown",
-                            options=[{"label": client, "value": client} for client in df["client_name"].dropna().unique()],
+                            options=[{"label": county, "value": county}
+                                     for county in df["county"].dropna().unique()],
                             value=None,
                             multi=True,
                         ),
@@ -76,10 +72,25 @@ controls = html.Div(
                 ),
                 html.Div(
                     [
-                        html.Div("Select a category", className="control_label"),
+                        html.Div("Select a client", className="control_label"),
+                        dcc.Dropdown(
+                            id="client-dropdown",
+                            options=[{"label": client, "value": client}
+                                     for client in df["client_name"].dropna().unique()],
+                            value=None,
+                            multi=True,
+                        ),
+                    ],
+                    className="control_item",
+                ),
+                html.Div(
+                    [
+                        html.Div("Select a category",
+                                 className="control_label"),
                         dcc.Dropdown(
                             id="category-dropdown",
-                            options=[{"label": category, "value": category} for category in df["category"].dropna().unique()],
+                            options=[{"label": category, "value": category}
+                                     for category in df["category"].dropna().unique()],
                             value=None,
                             multi=True,
                         ),
@@ -126,7 +137,7 @@ insights_and_graphs = html.Div(
 datatable_container = html.Div(
     [
         html.H2("Data Table", className="graph_title"),
-        # data table here
+        dash_table.DataTable(id='data_table',),
     ],
     className="data_table_container",
 )
@@ -141,17 +152,22 @@ app.layout = html.Div(
     className="container",
 )
 
+
 @app.callback(
     [Output('stats-box', 'children'),
      Output('overall-graph', 'figure'),
      Output('insights', 'children'),
-     Output('results-graph', 'figure'),],
+     Output('results-graph', 'figure'),
+     Output('data_table', 'data'),
+     Output('data_table', 'columns'),],
     [Input('county-dropdown', 'value'),
      Input('category-dropdown', 'value'),
      Input('client-dropdown', 'value'),
-     Input('remove-data-checklist', 'value')]
+     Input('radio-buttons', 'value'),
+     Input('remove-data-checklist', 'value'),
+     Input('results-graph', 'clickData')]
 )
-def update_output(selected_county, selected_category, selected_client, remove_data):
+def update_output(selected_county, selected_category, selected_client, radio_buttons, remove_data, clickData):
     # filter the dataframe based on the selected dropdown values
     filtered_df = df
     if selected_county:
@@ -170,14 +186,34 @@ def update_output(selected_county, selected_category, selected_client, remove_da
         filtered_df = filtered_df[filtered_df['total_amount_billed']
                                   < filtered_df['total_amount_billed'].quantile(0.90)]
 
-    # generate the overall histogram for each category, ordering by the number of cases descending
-    overall_hist = filtered_df.groupby('category').agg(
-        {'matter_id': 'nunique'}).reset_index().rename(columns={'matter_id': 'counts'})
-    overall_hist = overall_hist.sort_values('counts', ascending=True)
-
-    overall_hist_fig = px.bar(overall_hist, y='category', x='counts', orientation='h',
-                              title='Number of Cases by Category',
-                              labels={'category': 'Category', 'matter_id': 'Number of Cases'})
+    if radio_buttons == 'category':
+        # generate the overall histogram for each category, ordering by the number of cases descending
+        overall_hist = filtered_df.groupby('category').agg(
+            {'matter_id': 'nunique'}).reset_index().rename(columns={'matter_id': 'counts'})
+        overall_hist = overall_hist.sort_values('counts', ascending=True)
+        overall_hist_fig = px.bar(overall_hist, y='category', x='counts', orientation='h',
+                                  title='Number of Cases by Category',
+                                  labels={'category': 'Category',
+                                          'matter_id': 'Number of Cases'},
+                                  hover_data={'category': False, 'counts': True})
+    elif radio_buttons == 'county':
+        overall_hist = filtered_df.groupby('county').agg(
+            {'matter_id': 'nunique'}).reset_index().rename(columns={'matter_id': 'counts'})
+        overall_hist = overall_hist.sort_values('counts', ascending=True)
+        overall_hist_fig = px.bar(overall_hist, y='county', x='counts', orientation='h',
+                                  title='Number of Cases by County',
+                                  labels={'county': 'County',
+                                          'matter_id': 'Number of Cases'},
+                                  hover_data={'county': False, 'counts': True})
+    elif radio_buttons == 'client':
+        overall_hist = filtered_df.groupby('client_name').agg(
+            {'matter_id': 'nunique'}).reset_index().rename(columns={'matter_id': 'counts'})
+        overall_hist = overall_hist.sort_values('counts', ascending=True)
+        overall_hist_fig = px.bar(overall_hist, y='client_name', x='counts', orientation='h',
+                                  title='Number of Cases by Client',
+                                  labels={'client_name': 'Client',
+                                          'matter_id': 'Number of Cases'},
+                                  hover_data={'client_name': False, 'counts': True})
 
     # generate and return the stats and figure
     number_of_cases = filtered_df['matter_id'].nunique()
@@ -189,7 +225,8 @@ def update_output(selected_county, selected_category, selected_client, remove_da
         dcc.Markdown(f'Number of Cases: **{number_of_cases}**'),
         dcc.Markdown(f'Mean Total Amount Billed: **{mean_fee:.2f}**'),
         dcc.Markdown(f'Median Total Amount Billed: **{median_fee:.2f}**'),
-        dcc.Markdown(f'Standard Deviation of Total Amount Billed: **{std_fee:.2f}**')
+        dcc.Markdown(
+            f'Standard Deviation of Total Amount Billed: **{std_fee:.2f}**')
     ])
 
     hist_data = filtered_df['total_amount_billed']
@@ -205,7 +242,19 @@ def update_output(selected_county, selected_category, selected_client, remove_da
         yaxis_title='Count'
     )
 
-    return stats_box, overall_hist_fig, "Results", fig
+    if clickData:
+        selected_amount = clickData['points'][0]['x']
+        filtered_df_new = filtered_df[filtered_df['total_amount_billed']
+                                      <= selected_amount]
+        filtered_df_new = filtered_df_new[['matter_id', 'client_name', 'matter_description',
+                                           'county', 'category', 'total_hours_worked', 'total_amount_billed']]
+        filtered_df_new = filtered_df_new.sort_values(
+            'total_amount_billed', ascending=False)
+        data = filtered_df_new.to_dict('records')
+        columns = [{'name': i, 'id': i} for i in filtered_df_new.columns]
+        return stats_box, overall_hist_fig, "Results", fig, data, columns
+    else:
+        return stats_box, overall_hist_fig, "Results", fig, [], []
 
 
 if __name__ == '__main__':
