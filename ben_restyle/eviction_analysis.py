@@ -17,6 +17,11 @@ df = df.rename(columns={'tmatter': 'matter_id', 'clname1': 'client_name',
 # print the columns of the dataframe
 print(df.columns)
 
+# read in the timecard data
+path = '../Bill_meeting_20240221/eviction_matter_tk_data.csv'
+df_tc = pd.read_csv(path)
+
+
 # define a function for the insights
 
 
@@ -142,12 +147,22 @@ datatable_container = html.Div(
     className="data_table_container",
 )
 
+# add the hour by timekeeper level graph
+tk_hour_graph = html.Div(
+    [
+        html.H2("Total Hours Worked by Timekeeper", className="graph_title"),
+        dcc.Graph(id="tk-hour-graph"),
+    ],
+    className="tk_hour_container",
+)
+
 app.layout = html.Div(
     [
         header,
         controls,
         insights_and_graphs,
         datatable_container,
+        tk_hour_graph
     ],
     className="container",
 )
@@ -159,7 +174,8 @@ app.layout = html.Div(
      Output('insights', 'children'),
      Output('results-graph', 'figure'),
      Output('data_table', 'data'),
-     Output('data_table', 'columns'),],
+     Output('data_table', 'columns'),
+     Output('tk-hour-graph', 'figure'),],
     [Input('county-dropdown', 'value'),
      Input('category-dropdown', 'value'),
      Input('client-dropdown', 'value'),
@@ -185,6 +201,9 @@ def update_output(selected_county, selected_category, selected_client, radio_but
     elif 'TOP_10' in remove_data:
         filtered_df = filtered_df[filtered_df['total_amount_billed']
                                   < filtered_df['total_amount_billed'].quantile(0.90)]
+
+    filtered_df_tc = df_tc[df_tc['matter_id'].isin(
+        filtered_df['matter_id'])]
 
     if radio_buttons == 'category':
         # generate the overall histogram for each category, ordering by the number of cases descending
@@ -229,18 +248,24 @@ def update_output(selected_county, selected_category, selected_client, radio_but
             f'Standard Deviation of Total Amount Billed: **{std_fee:.2f}**')
     ])
 
-    hist_data = filtered_df['total_amount_billed']
-    hist_data_counts, hist_data_bins = np.histogram(hist_data, bins=50)
+    fig = px.histogram(filtered_df, nbins=50, x='total_amount_billed',
+                       title='Distribution of Total Amount Billed')
+    fig.update_xaxes(title_text='Total Amount Billed')
+    fig.update_yaxes(title_text='Count')
 
-    fig = go.Figure(data=[go.Bar(
-        x=hist_data_bins, y=hist_data_counts, text=hist_data_counts, textposition='auto',
-        hovertemplate='Total Amount Billed: %{x:.2f}<br>Count: %{y}<extra></extra>')])
+    # generate the histogram for the timekeeper hours by tktitle
+    tk_hour_hist = filtered_df_tc.groupby(by=['matter_id', 'timekeeper_title']).agg(
+        {'total_work_hours': 'sum'}).reset_index()
 
-    fig.update_layout(
-        title='Distribution of Total Amount Billed',
-        xaxis_title='Total Amount Billed',
-        yaxis_title='Count'
-    )
+    # sort the values by total_bill_hours
+    tk_hour_hist = tk_hour_hist.sort_values(
+        'total_work_hours', ascending=False)
+
+    tk_hour_fig = px.bar(tk_hour_hist, x='matter_id', y='total_work_hours', color='timekeeper_title',
+                         title='Total Worked Hours by Timekeeper',
+                         labels={'timekeeper_title': 'Timekeeper',
+                                 'total_work_hours': 'Total Worked Hours'},
+                         hover_data={'timekeeper_title': False, 'total_work_hours': True, })
 
     if clickData:
         selected_amount = clickData['points'][0]['x']
@@ -250,11 +275,19 @@ def update_output(selected_county, selected_category, selected_client, radio_but
                                            'county', 'category', 'total_hours_worked', 'total_amount_billed']]
         filtered_df_new = filtered_df_new.sort_values(
             'total_amount_billed', ascending=False)
+        # from the filtered_df_tc, generate the total_not_billed_hours
+        # and total_bill_hours by each matter_id
+        filtered_df_tc_new = filtered_df_tc[filtered_df_tc['matter_id'].isin(
+            filtered_df_new['matter_id'])]
+        filtered_df_tc_new = filtered_df_tc_new.groupby('matter_id').agg(
+            {'non_billed_hours': 'sum', 'total_bill_hours': 'sum'}).reset_index()
+        filtered_df_new = filtered_df_new.merge(
+            filtered_df_tc_new, on='matter_id', how='left')
         data = filtered_df_new.to_dict('records')
         columns = [{'name': i, 'id': i} for i in filtered_df_new.columns]
-        return stats_box, overall_hist_fig, "Results", fig, data, columns
+        return stats_box, overall_hist_fig, "Results", fig, data, columns, tk_hour_fig
     else:
-        return stats_box, overall_hist_fig, "Results", fig, [], []
+        return stats_box, overall_hist_fig, "Results", fig, [], [], tk_hour_fig
 
 
 if __name__ == '__main__':
