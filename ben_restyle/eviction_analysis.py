@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 
+from insight_func import get_insights
+
 # read in the data
 df = pd.read_csv('evict_elite_info.csv')
 
@@ -20,17 +22,6 @@ print(df.columns)
 # read in the timecard data
 path = '../Bill_meeting_20240221/eviction_matter_tk_data.csv'
 df_tc = pd.read_csv(path)
-
-
-# define a function for the insights
-
-
-def get_insights(df, county, category, client):
-    if client == 'Monticello Asset Management, Inc.':
-        pass
-    elif client == 'Accolade Property Management, Inc.':
-        client_sentence = "Most cases fall under the non-payment eviction appeal category."
-
 
 # create the dash app
 app = dash.Dash(__name__)
@@ -121,7 +112,7 @@ insights_and_graphs = html.Div(
         html.Div(
             [
                 html.H2("Insights", className="graph_title"),
-                html.P(id="insights"),
+                html.Div(id="insights"),
                 html.Div(id="stats-box"),
                 html.H2("Trim the Data", className="graph_title"),
                 dcc.Checklist(
@@ -171,8 +162,8 @@ app.layout = html.Div(
 @app.callback(
     [Output('stats-box', 'children'),
      Output('overall-graph', 'figure'),
-     Output('insights', 'children'),
      Output('results-graph', 'figure'),
+     Output('insights', 'children'),
      Output('data_table', 'data'),
      Output('data_table', 'columns'),
      Output('tk-hour-graph', 'figure'),],
@@ -239,6 +230,14 @@ def update_output(selected_county, selected_category, selected_client, radio_but
     mean_fee = round(filtered_df['total_amount_billed'].mean(), 2)
     median_fee = filtered_df['total_amount_billed'].median()
     std_fee = round(filtered_df['total_amount_billed'].std(), 2)
+    if (selected_county is not None) and (selected_county is not None) and (selected_client is not None):
+        client_list = ["Monticello Asset Management, Inc.", "Accolade Property Management, Inc."]
+        print(f"'{selected_client}'", [f"'{client}'" for client in client_list], selected_client in client_list, 'true or not')
+        insight = get_insights(str(selected_county), str(selected_category), str(selected_client))
+        print(insight)
+    else:
+        insight = "we only have insights when all three criteria are chosen for now"
+    insight_box = html.Div([html.H3(insight)])
     stats_box = html.Div([
         html.H2('Statistics'),
         dcc.Markdown(f'Number of Cases: **{number_of_cases}**'),
@@ -285,9 +284,9 @@ def update_output(selected_county, selected_category, selected_client, radio_but
             filtered_df_tc_new, on='matter_id', how='left')
         data = filtered_df_new.to_dict('records')
         columns = [{'name': i, 'id': i} for i in filtered_df_new.columns]
-        return stats_box, overall_hist_fig, "Results", fig, data, columns, tk_hour_fig
+        return stats_box, overall_hist_fig, fig, insight_box, data, columns, tk_hour_fig
     else:
-        return stats_box, overall_hist_fig, "Results", fig, [], [], tk_hour_fig
+        return stats_box, overall_hist_fig, fig, insight_box, [], [], tk_hour_fig
 
 
 if __name__ == '__main__':
