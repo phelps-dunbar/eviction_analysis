@@ -3,10 +3,12 @@
 # how many hours and how much money has been billed
 # for the matter
 
-from elite_sql_call import run_query_elite
+
 import pandas as pd
 import numpy as np
 import os
+
+from elite_sql_call import run_query_elite
 
 
 def matter_tk_func(matter_id):
@@ -15,10 +17,12 @@ def matter_tk_func(matter_id):
     for the timecard and timekeep data for the matter
     '''
     query = f'''
-    SELECT tmatter AS matter_id,
-    ttk as timekeeper_id,
-    tkfirst + ' ' + tklast as timekeeper_name,
-    tktitle as timekeeper_title,
+    SELECT tc.tmatter AS matter_id,
+    tk.ttk as timekeeper_id,
+    tk.tkfirst + ' ' + tk.tklast as timekeeper_name,
+    m.mbillaty as billing_attorney,
+    tk2.tkfirst + ' ' + tk2.tklast as billing_attorney_name,
+    tk.tktitle as timekeeper_title,
     ROUND(AVG(tworkrt), 2) as weighted_avg_work_rate,
     ROUND(AVG(tbillrt), 2) as weighted_avg_bill_rate,
     ROUND(SUM(tworkhrs), 2) as total_work_hours,
@@ -28,8 +32,12 @@ def matter_tk_func(matter_id):
     FROM timecard tc
     INNER JOIN timekeep tk
         ON tc.ttk = tk.tkinit
+    INNER JOIN matter m
+        ON tc.tmatter = m.mmatter
+    INNER JOIN timekeep tk2
+        ON m.mbillaty = tk2.tkinit
     WHERE tmatter = '{matter_id}'
-    GROUP BY tmatter, ttk, tkfirst, tklast, tktitle
+    GROUP BY tc.tmatter, tk.ttk, tk.tkfirst, tk.tklast, tk.tktitle, m.mbillaty, tk2.tkfirst, tk2.tklast
     ORDER BY tmatter;
     '''
     df = run_query_elite(query)
