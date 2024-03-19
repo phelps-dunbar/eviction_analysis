@@ -1,7 +1,9 @@
 # ignore the csv and xlsx files
+# and zip files
 *.csv
 *.xlsx
 *.png
+*.zip
 ```
 
 # ignore all yaml files
