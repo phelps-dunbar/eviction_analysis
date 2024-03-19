@@ -26,7 +26,7 @@ all_matters_df = pd.DataFrame()
 for matter in matter_list:
     df = matter_tk_func(matter)
     print(df.head())
-    all_matters_df = all_matters_df.append(df, ignore_index=True)
+    all_matters_df = pd.concat([all_matters_df, df], ignore_index=True)
 
 # generate the non_billed_hours column
 all_matters_df['non_billed_hours'] = all_matters_df['total_work_hours'] - \
